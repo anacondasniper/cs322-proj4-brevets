@@ -126,8 +126,12 @@
     var km = control.find("input[name='km']").val();
     var open_time_field = control.find("input[name='open']");
     var close_time_field = control.find("input[name='close']");
-    
-    $.getJSON(TIME_CALC_URL, { km: km }, 
+	var brevet_dist = $('#brevet_dist_km').val();
+	var date = $('#begin_date').val();
+	var time = $('#begin_time').val();
+	var start = moment(date + " " + time).format();
+	
+    $.getJSON(TIME_CALC_URL, { km: km, brevet_dist: brevet_dist, start_time: start }, 
       // response handler
       function(data) {
          var times = data.result;
@@ -140,8 +144,6 @@
     }
 
   $(document).ready(function(){
-   // Do the following when the page is finished loading
-
       $('input[name="miles"]').change(
          function() {
              var miles = parseFloat($(this).val());
@@ -165,8 +167,16 @@
              // Then calculate times for this entry
              calc_times(control_entry);
           });
-
-     });   // end of what we do on document ready
+	
+	  $('#brevet_dist_km, #begin_date, #begin_time').change(
+		  function() {
+			  $('.control').each(function() {
+				  if ($(this).find("input[name=km]").val()) {
+				     calc_times($(this));
+				   }
+			  });
+		  });
+  });   // end of what we do on document ready
 
 </script>
 

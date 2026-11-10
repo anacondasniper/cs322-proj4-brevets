@@ -1,74 +1,96 @@
-# Project 4: Brevet time calculator with Ajax
+# ACP Brevet Control Times Calculator
 
-Reimplement the RUSA ACP controle time calculator with flask and ajax.
+**Author:** Milo Reynolds, miloreyn@uoregon.edu
+**Course:** CIS 322, Project 4 (Flask + Ajax)
 
-Credits to Michal Young for the initial version of this code.
+A web calculator for randonneuring (long-distance cycling) brevets. An organizer picks the brevet length and start time, then types control (checkpoint) distances into the table. The open and close time for each control fill in automatically, without a page reload, using Ajax calls to a Flask server.
 
-## ACP controle times
+It reimplements the calculator at <https://rusa.org/octime_acp.html>, following the algorithm described at <https://rusa.org/pages/acp-brevet-control-times-calculator>.
 
-That's "controle" with an 'e', because it's French, although "control" is also accepted. Controls are points where a rider must obtain proof of passage, and control[e] times are the minimum and maximum times by which the rider must arrive at the location.   
+## Running it
 
-The algorithm for calculating controle times is described here (https://rusa.org/pages/acp-brevet-control-times-calculator). Additional background information is given here (https://rusa.org/pages/rulesForRiders). The description is ambiguous, but the examples help. Part of finishing this project is clarifying anything that is not clear about the requirements, and documenting it clearly.  
+From the `brevets` directory:
 
-We are essentially replacing the calculator here (https://rusa.org/octime_acp.html). We can also use that calculator to clarify requirements and develop test data.  
+```
+docker build -t brevets .
+docker run -p 5000:5000 brevets
+```
 
-## AJAX and Flask reimplementation
+Then open <http://localhost:5000>. (Use the port set in `credentials.ini` if you changed it.)
 
-The RUSA controle time calculator is a Perl script that takes an HTML form and emits a text page in the above link. 
+### Using the page
 
-The implementation that you will do will fill in times as the input fields are filled using Ajax and Flask. Currently the miles to km (and vice versa) is implemented with Ajax. You'll extend that functionality as follows:
+1. Choose the brevet distance (200, 300, 400, 600 or 1000 km) and the start date and time.
+2. Type a distance in either the **Miles** or the **Km** column of a row. The other column and the **Open** and **Close** times fill in on their own.
+3. Changing the brevet distance or start time recalculates every filled-in row.
 
-* Each time a distance is filled in, the corresponding open and close times should be filled in with Ajax.   
+### Running the tests
 
-* You'll also implement the logic in acp_times.py based on the algorithm given above. I will leave much of the design to you. You'll turn the implementation that you do. See below for more information.
+From the `brevets` directory:
 
-## Testing
+```
+nosetests
+```
 
-A suite of nose test cases is a requirement of this project. Design the test cases based on an interpretation of rules here (https://rusa.org/pages/acp-brevet-control-times-calculator). Be sure to test your test cases: You can use the current brevet time calculator (https://rusa.org/octime_acp.html) to check that your expected test outputs are correct. While checking these values once is a manual operation, re-running your test cases should be automated in the usual manner as a Nose test suite.
+All tests should pass. They call `acp_times.open_time` and `acp_times.close_time` directly with known inputs. The expected values were checked by hand against the examples on the RUSA page and the RUSA online calculator.
 
-To make automated testing more practical, your open and close time calculations should be in a separate module. Because I want to be able to use my test suite as well as yours, I will require that module be named acp_times.py and contain the two functions I have included in the skeleton code (though revised, of course, to return correct results).
+## How the times are calculated
 
-We should be able to run your test suite by changing to the "brevets" directory and typinng "nosetests". All tests should pass. You should have at least 5 test cases, and more importantly, your test cases should be chosen to distinguish between an implementation that correctly interprets the ACP rules and one that does not.
+A control's **open time** is the earliest a rider may arrive: the start time plus the time to ride the control's distance at the *maximum* speeds. Its **close time** is the latest a rider may arrive, using the *minimum* speeds. All times are computed in `brevets/acp_times.py`.
 
-## Replace this README
+### Speed table
 
-This README is currently written primarily as instructions to CIS 322 students. Replace it with a proper README for an ACP time calculator. Think about what should be included for users and for developers. If it is growing too long, factor details into one or more separate documents, with references from the README. At the end, add your details.
+| Control location (km) | Minimum speed (km/h) | Maximum speed (km/h) |
+|---|---|---|
+| 0 - 200 | 15 | 34 |
+| 200 - 400 | 15 | 32 |
+| 400 - 600 | 15 | 30 |
+| 600 - 1000 | 11.428 | 28 |
 
-## Tasks
+(The 1000 - 1300 row on the RUSA page applies only to events longer than 1000 km, so it is not used.)
 
-The code under "brevets" can serve as a starting point. It illustrates a very simple Ajax transaction between the Flask server and javascript on the web page. At present the server does not calculate times. It just returns double the number of miles. Other things may be missing; add them as needed. As before, you should fork and then clone the bitbucket repository, make your changes, and turn in the URL of your repository.
+### Controls spanning several rows
 
-You'll turn in your credentials.ini using which we will get the following:
+The speeds depend on how far along the route each *portion* of the distance is. A control is **not** computed with the single row its distance falls in. The distance is split into the part inside each speed zone, each part is divided by that zone's speed, and the results are added.
 
-* The working application.
+Example: a control at 350 km.
 
-* A README.md file that includes not only identifying information (your name, email, etc.) but but also a revised, clear specification of the brevet controle time calculation rules.
+- Open: 200/34 + 150/32 = 5.88 h + 4.69 h = 10.57 h = **10H34**
+- Close: 350/15 = 23.33 h = **23H20**
 
-* An automated 'nose' test suite.
+Example: a control at 890 km on a 1000 km brevet.
 
-* Dockerfile
+- Open: 200/34 + 200/32 + 200/30 + 290/28 = 29.156 h = **29H09**
+- Close: 600/15 + 290/11.428 = 65.378 h = **65H23**
 
-## Grading Rubric
+The total hours are converted to minutes and rounded to the nearest minute, then added to the brevet start time.
 
-* If your code works as expected: 100 points. This includes:
-	* AJAX in the frontend. That is, open and close times are automatically populated, 
-	* Logic in the backend (acp_times.py), 
-	* Frontend to backend interaction (with correct requests/responses), 
-	* README is updated with a clear specification, and 
-	* All five tests pass.
+### Special rules
 
-* If the AJAX logic is not working, 10 points will be docked off. 
+- **Controls past the brevet distance.** A control located beyond the nominal brevet distance is calculated as if it were at the brevet distance. For example, a control at 205 km on a 200 km brevet is treated as 200 km.
+- **Finish control close time.** The control at the end of the brevet closes at a fixed time limit rather than the formula result:
 
-* If the README is not clear or missing, up to 15 points will be docked off. 
+  | Brevet | Final close time |
+  |---|---|
+  | 200 km | 13H30 |
+  | 300 km | 20H00 |
+  | 400 km | 27H00 |
+  | 600 km | 40H00 |
+  | 1000 km | 75H00 |
 
-* If the test cases fail, up to 15 points will be docked off. 
+  (For example, 200/15 = 13H20, but the 200 km limit is 13H30.)
+- **Controls in the first 60 km.** The close time is distance/20 + 1 hour (the 2018 relaxed rule, also called the French variation). So the start control (0 km) closes 1 hour after the start, a control at 30 km closes after 2H30, and a control at 60 km closes after 4H00, which is the same as the standard 60/15.
+- **Start control.** A control at 0 km opens at the start time.
+- **Distances.** Kilometer values are used as entered. Miles entered in the Miles column are converted to km (1 mile = 1.609344 km) and shown to one decimal place.
 
-* If the logic in the acp_times.py file is wrong or is missing in the appropriate location, 30 points will be docked off.
+## Project layout
 
-* If none of the functionalities work, 30 points will be given assuming 
-    * The credentials.ini is submitted with the correct URL of your repo, and
-    * The Dockerfile builds without any errors
-    
-* If the Dockerfile doesn't build or is missing, 10 points will be docked off.
+- `brevets/acp_times.py`: `open_time` and `close_time`, the calculation logic.
+- `brevets/flask_brevets.py`: the Flask app and the `/_calc_times` Ajax route.
+- `brevets/templates/calc.html`: the page and its JavaScript.
+- `brevets/test_acp_times.py`: the test suite.
+- `brevets/Dockerfile`: builds and runs the app.
 
-* If credentials.ini is missing, 0 will be assigned.
+## Credits
+
+Initial version of the starter code by Michal Young. Modified by Milo Reynolds.
